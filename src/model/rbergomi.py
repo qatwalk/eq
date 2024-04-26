@@ -77,35 +77,31 @@ class rBergomiMCState(MCStateBase):
         if dt < 1e-10:
             return
 
-        # generate the random numbers for the hybrid scheme
-        dwv = self.rng.multivariate_normal(
-            self.mean, cov(self.a, dt), self.n
-        ).transpose()
+        # generate two sets of random numbers for the hybrid scheme for variance
+        dwv = self.rng.multivariate_normal(self.mean, cov(self.a, dt), self.n)
+
+        # and one set for stock, correlated to dwv[:, 0]
+        dws = self.rng.normal(0, np.sqrt(dt) * self.rho_comp, self.n)
+        dws += self.rho * dwv[:, 0]
 
         # Update the log stock process first,
-        # using a Wiener process correlated to dwv[0]
-        dws = self.rng.normal(0, np.sqrt(dt) * self.rho_comp, self.n)
-        dws += self.rho * dwv[0]
-
         fwd_rate = self.asset_fwd.rate(new_time, self.cur_time)
-
         self.x_vec += (fwd_rate - self.V / 2.0) * dt
         self.x_vec += np.sqrt(self.V) * dws
 
-        # First part of variance: Exact integrals
-        YE = dwv[1]
-
-        # Second part of variance: Riemann sums using convolution
+        # One part of variance: Riemann sums using convolution
         # Construct arrays for convolution
-        self.X[:, self.k] = dwv[0]  # Xi
+        self.X[:, self.k] = dwv[:, 0]  # append to X history
         self.k += 1
-        if self.k > 1:
+        if self.k > 1:  # append to G history
             self.G[self.k] = g(b(self.k, self.a) * dt, self.a)
         # Convolution
-        YR = np.matmul(self.X[:, : self.k - 1], self.G[self.k : 1 : -1])
+        Y = np.matmul(self.X[:, : self.k - 1], self.G[self.k : 1 : -1])
 
-        # Finally construct and return full process
-        Y = np.sqrt(2 * self.a + 1) * (YE + YR)
+        # Add the other part of variance: Exact integrals
+        np.add(Y, dwv[:, 1], out=Y)
+        # Scale the variance process
+        np.multiply(Y, np.sqrt(2 * self.a + 1), out=Y)
 
         self.V = self.xi * np.exp(
             self.eta * Y - 0.5 * self.eta**2 * new_time ** (2 * self.a + 1)
