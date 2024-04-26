@@ -102,7 +102,7 @@ class rBergomiMCState(MCStateBase):
         if self.k > 1:
             self.G[self.k] = g(b(self.k, self.a) * dt, self.a)
         # Convolution
-        YR = np.dot(self.X[:, : self.k - 1], self.G[self.k : 1 : -1])
+        YR = np.matmul(self.X[:, : self.k - 1], self.G[self.k : 1 : -1])
 
         # Finally construct and return full process
         Y = np.sqrt(2 * self.a + 1) * (YE + YR)
