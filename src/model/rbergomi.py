@@ -1,3 +1,9 @@
+"""
+Monte Carlo Implementation of the rBergomi model using the scheme proposed by
+Mikkel Bennedsen, Asger Lunde, and Mikko S Pakkanen.,
+"Hybrid scheme for Brownian semistationary processes.",
+Finance and Stochastics, 21(4): 931-965, 2017.
+"""
 import numpy as np
 from qablet.base.mc import MCModel, MCStateBase
 from numpy.random import Generator, SFC64
@@ -14,6 +20,7 @@ def g(x, a):
 def b(k, a):
     """
     Optimal discretisation of TBSS process for minimising hybrid scheme error.
+    (Review: is it still optimal when dt is not constant?)
     """
     return ((k ** (a + 1) - (k - 1) ** (a + 1)) / (a + 1)) ** (1 / a)
 
@@ -31,12 +38,7 @@ def cov(a, dt):
 
 
 class rBergomiMCState(MCStateBase):
-    """
-    Monte Carlo Implementation of the rBergomi model using the scheme proposed by
-    Mikkel Bennedsen, Asger Lunde, and Mikko S Pakkanen.,
-    "Hybrid scheme for Brownian semistationary processes.",
-    Finance and Stochastics, 21(4): 931-965, 2017.
-    """
+    """MCStateClass that implements advance and get_value methods, as needed by the Qablet MCModel interface."""
 
     def __init__(self, timetable, dataset):
         super().__init__(timetable, dataset)
@@ -112,10 +114,7 @@ class rBergomiMCState(MCStateBase):
         self.cur_time = new_time
 
     def get_value(self, unit):
-        """Return the value of the unit at the current time.
-        This model uses black scholes model for one asset, return its value using the simulated array.
-        For any other asset that may exist in the timetable, just return the default implementation in
-        the model base (i.e. simply return the forwards)."""
+        """Return the value of the unit at the current time."""
 
         if unit == self.asset:
             return self.spot * np.exp(self.x_vec)

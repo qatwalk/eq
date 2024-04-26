@@ -1,18 +1,21 @@
-import pyarrow as pa
+"""
+An example to try the rBergomi model with a Vanilla Option contract.
+"""
 import numpy as np
-from qablet_contracts.timetable import py_to_ts, TS_EVENT_SCHEMA
+from qablet_contracts.timetable import py_to_ts
 from datetime import datetime
 from rbergomi import rBergomiMCModel
+from qablet_contracts.eq.vanilla import Option
 
 
 def run_model():
-    model = rBergomiMCModel()
-
+    # Define the dataset
     times = np.array([0.0, 5.0])
     rates = np.array([0.04, 0.04])
     discount_data = ("ZERO_RATES", np.column_stack((times, rates)))
+    spot = 4600
     div_rate = 0.01
-    fwds = 100 * np.exp((rates - div_rate) * times)
+    fwds = spot * np.exp((rates - div_rate) * times)
     fwd_data = ("FORWARDS", np.column_stack((times, fwds)))
     ticker = "SPX"
 
@@ -26,7 +29,7 @@ def run_model():
             "SEED": 1,
         },
         "rB": {
-            "ASSET": "SPX",
+            "ASSET": ticker,
             "ALPHA": -0.45,
             "RHO": -0.8,
             "XI": 0.11,
@@ -34,21 +37,18 @@ def run_model():
         },
     }
 
-    # We will define a forward timetable, instead of using contract classes from qablet_contracts
-    events = [
-        {
-            "track": "",
-            "time": datetime(2024, 12, 31),
-            "op": "+",
-            "quantity": 1,
-            "unit": ticker,
-        }
-    ]
+    # Create a Vanilla Option Contract
+    opt_timetable = Option(
+        "USD",
+        ticker,
+        strike=spot,
+        maturity=datetime(2024, 12, 31),
+        is_call=True,
+    ).timetable()
 
-    events_table = pa.RecordBatch.from_pylist(events, schema=TS_EVENT_SCHEMA)
-    fwd_timetable = {"events": events_table, "expressions": {}}
-
-    return model.price(fwd_timetable, dataset)
+    # Create model and price the option
+    model = rBergomiMCModel()
+    return model.price(opt_timetable, dataset)
 
 
 if __name__ == "__main__":

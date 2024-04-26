@@ -1,20 +1,16 @@
-## Using this template
+## Premise
+In *“A Perfect Calibration ! Now What ?”*, 2003, Schoutens et al calibrated 7 volatility models to the same implied volatilities, and then compared them for exotics -  cliquets, barriers, etc.
 
-This is a template to create your own repositary for notebooks with examples of qablet contracts or models.
-After you have created your own repositary, delete this section from the README and add your own project details below.
 
-You can test your notebooks using [nbmake](https://pypi.org/project/nbmake/).
+- to demonstrate that models calibrated to vanillas still disagree on exotics, and
+- to gain insights on how specific exotics are sensitive to different model dynamics
 
-You can keep the git commits clean using [nb-clean](https://pypi.org/project/nb-clean/). We recomment using
-```
-nb-clean add-filter --preserve-cell-outputs
-```
+Since then, many models have appeared in the landscape, such as the Bergomi and Rough Bergomi models. There have been studies on the processes, calibration methods, and their implied vol surfaces, but no comprehensive study on their impact on different exotic contracts.
 
-## About Us
-About yourself or the team.
+## Proposal
+We propose a public repository of python libraries and jupyter notebooks that makes available
 
-## About this Repositary
-What kind of models or contracts are shown here.
+- A number of models, along with parameters calibrated to a common volatility surface
+- A series of notebooks, for vanillas, and different exotics such as cliquets, barriers, forward options, call-on-calls, and autocallables, comparing price from each model.
 
-## About Qablet
-A Qablet timetable defines a financial product using a sequence of payments, choices and conditions. You can define your own contract, and value it using any of the Qablet models. You can also create your own model and use it to value any Qablet contract. To learn more [Start Here](https://github.com/qablet-academy/intro/blob/main/notebooks/1_1_fixed_bond.ipynb).
+We will start with a few, and let the models, and contracts grow over time with more contributors.

@@ -1,3 +1,7 @@
+"""
+Utility to calculate implied volatility using Black-Scholes model.
+(can be improved)
+"""
 import numpy as np
 from scipy.stats import norm
 
