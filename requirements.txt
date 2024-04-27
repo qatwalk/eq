@@ -5,3 +5,6 @@ scipy
 matplotlib
 qablet_contracts
 qablet-basic
+pytest
+nbmake
+nb-clean
