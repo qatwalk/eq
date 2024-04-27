@@ -45,6 +45,10 @@ clean:            ## Clean unused files.
 	@rm -rf htmlcov
 	@rm -rf .tox/
 
+.PHONY: install
+install:          ## Install the project in dev mode.
+	$(ENV_PREFIX)pip install -e .[test]
+
 .PHONY: virtualenv
 virtualenv:       ## Create a virtual environment.
 	@if [ "$(USING_POETRY)" ]; then poetry install && exit; fi
