@@ -7,4 +7,5 @@ qablet_contracts
 qablet-basic
 pytest
 nbmake
+ruff
 nb-clean
