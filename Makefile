@@ -9,7 +9,6 @@ help:             ## Show the help.
 	@echo "Targets:"
 	@fgrep "##" Makefile | fgrep -v fgrep
 
-
 .PHONY: show
 show:             ## Show the current environment.
 	@echo "Current environment:"
@@ -17,12 +16,6 @@ show:             ## Show the current environment.
 	@echo "Running using $(ENV_PREFIX)"
 	@$(ENV_PREFIX)python -V
 	@$(ENV_PREFIX)python -m site
-
-.PHONY: install
-install:          ## Install the project in dev mode.
-	@if [ "$(USING_POETRY)" ]; then poetry install && exit; fi
-	@echo "Don't forget to run 'make virtualenv' if you got errors."
-	$(ENV_PREFIX)pip install -e .[test]
 
 .PHONY: fmt
 fmt:              ## Format code using ruff & isort.
@@ -51,7 +44,6 @@ clean:            ## Clean unused files.
 	@rm -rf *.egg-info
 	@rm -rf htmlcov
 	@rm -rf .tox/
-	@rm -rf docs/_build
 
 .PHONY: virtualenv
 virtualenv:       ## Create a virtual environment.
