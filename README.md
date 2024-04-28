@@ -4,18 +4,15 @@
 ![cats](images/three_cats.png)
 
 ## Premise
-In *“A Perfect Calibration ! Now What ?,”* 2003, Schoutens et al calibrated 7 volatility models to the implied volatilities, and then compared them for exotics such as cliquets, barriers, etc.
-
-
-- to demonstrate that models calibrated to vanillas still disagree on exotics, and
-- to gain insights on how specific exotics are sensitive to different model dynamics
+In *“A Perfect Calibration ! Now What ?,”* 2003, Schoutens et al compared 7 volatility models to show that -
+though the models were calibrated to the same vanilla prices, they produced different results for exotics such as cliquets, barriers, etc.
 
 Since then, many models have appeared in the landscape, such as the Bergomi and Rough Bergomi models. There have been studies on the processes, calibration methods, and their implied vol surfaces, but no comprehensive study on their impact on different exotic contracts.
 
 ## Proposal
-We propose a public repository of libraries and jupyter notebooks that makes available
+This repositary aims to be an open, collaborative, and growing collection of
 
-- A number of models, along with parameters calibrated to a common volatility surface
-- A series of notebooks, for vanillas, and different exotics such as cliquets, barriers, forward options, call-on-calls, and autocallables, comparing price from each model.
+- a number of models, with parameters calibrated to a common volatility surface
+- a series of notebooks, for vanillas, and different exotics such as cliquets, barriers, forward options, call-on-calls, and autocallables, to compare prices from each model and gain insights of their specific dynamics.
 
 We will start with a few, and we will let the models, and contracts grow over time with more contributors.
