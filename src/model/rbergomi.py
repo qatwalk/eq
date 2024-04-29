@@ -5,8 +5,8 @@ Mikkel Bennedsen, Asger Lunde, and Mikko S Pakkanen.,
 Finance and Stochastics, 21(4): 931-965, 2017.
 """
 import numpy as np
+from numpy.random import SFC64, Generator
 from qablet.base.mc import MCModel, MCStateBase
-from numpy.random import Generator, SFC64
 from qablet.base.utils import Forwards
 
 

@@ -1,11 +1,12 @@
 """
 An example to try the rBergomi model with a Vanilla Option contract.
 """
-import numpy as np
-from qablet_contracts.timetable import py_to_ts
 from datetime import datetime
-from rbergomi import rBergomiMCModel
+
+import numpy as np
 from qablet_contracts.eq.vanilla import Option
+from qablet_contracts.timetable import py_to_ts
+from rbergomi import rBergomiMCModel
 
 
 def run_model():

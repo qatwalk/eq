@@ -7,8 +7,9 @@ Details of model specific data api:
 https://qablet-academy.github.io/intro/models/mc/
 """
 
-import numpy as np
 from datetime import datetime
+
+import numpy as np
 from qablet_contracts.timetable import py_to_ts
 from scipy.interpolate import RegularGridInterpolator
 
@@ -73,10 +74,10 @@ def heston_data():
         "MC": MC_PARAMS,
         "HESTON": {
             "ASSET": "SPX",
-            "INITIAL_VAR": 0.015,
-            "LONG_VAR": 0.052,
+            "INITIAL_VAR": 0.020,
+            "LONG_VAR": 0.032,
             "VOL_OF_VAR": 0.88,
-            "MEANREV": 2.78,
+            "MEANREV": 1.5,
             "CORRELATION": -0.85,
         },
     }
