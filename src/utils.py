@@ -41,6 +41,14 @@ def find_vol(target_value, F, K, T, is_call):
 
 
 def iv_surface(ticker, model, dataset, strikes, expirations):
+    """
+    Construct a volatility surface as follows:
+
+    - define a contract which is a series of forwards paying at given expiration dates.
+    - use the cashflow stats to get the cashflow values at all paths
+    - reconstrcut option prices for different strikes and maturities.
+    - get implied vols from the option prices.
+    """
     # Create a timetable that pays forwards at given expirations
     events = [
         {
@@ -67,18 +75,22 @@ def iv_surface(ticker, model, dataset, strikes, expirations):
     iv_mat = np.zeros((len(expirations), len(strikes)))
     for i, exp in enumerate(expirations):
         prc_ts = dataset["PRICING_TS"]
+        # Get Time in years from the millisecond timestamps
         T = (py_to_ts(exp).value - prc_ts) / (365.25 * 24 * 3600 * 1e3)
         df = discounter.discount(T)
         fwd = asset_fwds.forward(T)
 
+        # Use a call option for strikes above forward, a put option otherwise
         is_call = strikes > fwd
-        ic = is_call[..., None]
+        is_call_c = is_call[..., None]  # Turn into a column vector
 
+        # calculate prices (value as of expiration date)
         event_cf = cf[i] / df
-        KC = strikes[..., None]  # Turn into a column vector
-        pay = np.where(ic, event_cf - KC, KC - event_cf)
+        strikes_c = strikes[..., None]  # Turn into a column vector
+        pay = np.where(is_call_c, event_cf - strikes_c, strikes_c - event_cf)
         prices = np.maximum(pay, 0).mean(axis=1)
 
+        # calculate implied vols
         iv_mat[i, :] = [
             find_vol(p, fwd, k, T, ic)
             for p, k, ic in zip(prices, strikes, is_call)
