@@ -1,6 +1,5 @@
 """
 Utility to calculate implied volatility using Black-Scholes model.
-(can be improved)
 """
 
 import numpy as np
@@ -42,7 +41,7 @@ def find_vol(target_value, F, K, T, is_call):
 
 def iv_surface(ticker, model, dataset, strikes, expirations):
     """
-    Construct a volatility surface as follows:
+    Construct a volatility surface using provided qablet model and dataset as follows:
 
     - define a contract which is a series of forwards paying at given expiration dates.
     - use the cashflow stats to get the cashflow values at all paths

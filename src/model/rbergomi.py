@@ -60,7 +60,7 @@ class rBergomiMCState(MCStateBase):
         self.rng = Generator(SFC64(dataset["MC"]["SEED"]))
         self.x_vec = np.zeros(self.n)  # log stock process
         self.V = np.zeros(self.n)  # variance process
-        self.V.fill(self.xi)
+        self.V.fill(self.xi(0))
 
         # Preallocate arrays for the convolution (for 1000 timesteps)
         self.G = np.zeros(1000)
@@ -103,7 +103,7 @@ class rBergomiMCState(MCStateBase):
         # Scale the variance process
         np.multiply(Y, np.sqrt(2 * self.a + 1), out=Y)
 
-        self.V = self.xi * np.exp(
+        self.V = self.xi(new_time) * np.exp(
             self.eta * Y - 0.5 * self.eta**2 * new_time ** (2 * self.a + 1)
         )
 

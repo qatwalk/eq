@@ -12,6 +12,7 @@ from datetime import datetime
 import numpy as np
 from qablet_contracts.timetable import py_to_ts
 from scipy.interpolate import RegularGridInterpolator
+from scipy.interpolate import CubicSpline
 
 MC_PARAMS = {
     "PATHS": 100_000,
@@ -44,10 +45,8 @@ def rbergomi_data():
 
     # As of now the data below is not calibrated.
     H = 0.05
-    v0 = 0.025
-    eta = 2.3
-    rho = -0.9
-
+    x_vec = [0.025, 0.025]
+    t_vec = [.0025, 2.0]
     return {
         "BASE": "USD",
         "PRICING_TS": py_to_ts(prc_dt).value,
@@ -56,9 +55,9 @@ def rbergomi_data():
         "rB": {
             "ASSET": "SPX",
             "ALPHA": H - 0.5,
-            "RHO": rho,
-            "XI": v0,
-            "ETA": eta,
+            "RHO": -0.9,
+            "XI": CubicSpline(t_vec, x_vec),
+            "ETA": 2.3,
         },
     }
 

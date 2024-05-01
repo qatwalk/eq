@@ -8,5 +8,4 @@ __pycache__/
 .venv
 .vscode
 
-scratch.ipynb
-scratch.py
+scratch*
