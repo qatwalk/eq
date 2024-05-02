@@ -46,7 +46,7 @@ def rbergomi_data():
     # As of now the data below is not calibrated.
     H = 0.05
     x_vec = [0.025, 0.025]
-    t_vec = [.0025, 2.0]
+    t_vec = [0.0025, 2.0]
     return {
         "BASE": "USD",
         "PRICING_TS": py_to_ts(prc_dt).value,
