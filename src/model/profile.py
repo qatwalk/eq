@@ -1,6 +1,7 @@
 """
 Profile the rBergomi model to find timing bottlenecks in the code.
 """
+
 from line_profiler import LineProfiler
 from rbergomi import rBergomiMCState
 from rbergomi_example import run_model  # noqa: F401

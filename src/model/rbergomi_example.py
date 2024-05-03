@@ -1,12 +1,14 @@
 """
 An example to try the rBergomi model with a Vanilla Option contract.
 """
+
 from datetime import datetime
 
 import numpy as np
 from qablet_contracts.eq.vanilla import Option
 from qablet_contracts.timetable import py_to_ts
 from rbergomi import rBergomiMCModel
+from scipy.interpolate import CubicSpline
 
 
 def run_model():
@@ -33,7 +35,7 @@ def run_model():
             "ASSET": ticker,
             "ALPHA": -0.45,
             "RHO": -0.8,
-            "XI": 0.11,
+            "XI": CubicSpline([0.0025, 2.0], [0.025, 0.025]),
             "ETA": 2.5,
         },
     }

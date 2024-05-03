@@ -1,9 +1,10 @@
 """
-Monte Carlo Implementation of the rBergomi model using the scheme proposed by
-Mikkel Bennedsen, Asger Lunde, and Mikko S Pakkanen.,
+Monte Carlo Implementation of the rBergomi model using Qablet MCModel Interface.
+Uses the scheme proposed by Mikkel Bennedsen, Asger Lunde, and Mikko S Pakkanen.,
 "Hybrid scheme for Brownian semistationary processes.",
 Finance and Stochastics, 21(4): 931-965, 2017.
 """
+
 import numpy as np
 from numpy.random import SFC64, Generator
 from qablet.base.mc import MCModel, MCStateBase
