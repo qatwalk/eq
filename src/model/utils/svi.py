@@ -10,7 +10,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 
 def svi(params, k):
-    """Get SVI realized variance from params and log strikes k."""
+    """Get total variance from SVI params and log strikes."""
     k_m = k - params["m"]
     discr = np.sqrt(k_m**2 + params["sig"] ** 2)
     w = params["a"] + params["b"] * (params["rho"] * k_m + discr)
@@ -19,10 +19,9 @@ def svi(params, k):
 
 def _svi_local_var_step(k, dk, t0, t1, w_vec_prev, w_vec):
     """Calculate local variance (vol**2) from t0 to t1, given a list of strikes k, uniformly spaced by dk,
-    and the realized implied variances w (T * vol**2) at time t0 and t1.
+    and the total variances (w = T * vol**2) at time t0 and t1.
     The result vector is two elements shorter than the input vectors k and w."""
 
-    # Central
     w = (w_vec + w_vec_prev) / 2
     # time derivative of w
     wt = (w_vec - w_vec_prev) / (t1 - t0)
@@ -36,6 +35,7 @@ def _svi_local_var_step(k, dk, t0, t1, w_vec_prev, w_vec):
     k_ = k[1:-1]
     wt_ = wt[1:-1]
 
+    # apply Dupire's formula
     return wt_ / (
         1
         - k_ / w_ * wk
@@ -45,14 +45,14 @@ def _svi_local_var_step(k, dk, t0, t1, w_vec_prev, w_vec):
 
 
 def get_w_interp(k_vec, svi_df):
-    """Create an interpolator of realized variance by exp t_vec and k_vec."""
+    """Create an interpolator of total variances by t and k."""
     texp_vec = svi_df["texp"]
 
-    ws = np.zeros((len(texp_vec) + 1, len(k_vec)))
+    ws = np.zeros((len(texp_vec) + 1, len(k_vec)))  # initialize
 
+    # let ws[0] be zero, update ws[1:]
     for i, t in enumerate(texp_vec):
-        iv = svi(svi_df.loc[i], k_vec)
-        ws[i + 1] = iv
+        ws[i + 1] = svi(svi_df.loc[i], k_vec)
 
     return RegularGridInterpolator(
         ([0.0] + texp_vec.to_list(), k_vec),
@@ -63,12 +63,12 @@ def get_w_interp(k_vec, svi_df):
 
 
 def svi_local_vol(file_path, kmin, kmax, dk, t_vec):
-    """Calculates local vol from a SVI parameterized implied vol surface."""
+    """Calculates local vol from an SVI parameterized implied vol surface."""
 
     # read csv file with svi params
     svi_df = pd.read_csv(file_path)
 
-    # Create an interpolator of realized variance by exp t_vec and k_vec.
+    # Create an interpolator of total variance by exp t_vec and k_vec.
     k_vec = np.arange(kmin - dk, kmax + dk + dk / 2, dk)
     w_interp = get_w_interp(k_vec, svi_df)
 
@@ -96,7 +96,5 @@ if __name__ == "__main__":
         dk=dk,
         t_vec=t_vec,
     )
-    print(times)
-    print(strikes)
     mid = len(strikes) // 2
-    print(vols[:, mid])  # extremes and atm
+    print(vols[:, (0, mid, -1)])  # for each t: lowest K, atm, highest k

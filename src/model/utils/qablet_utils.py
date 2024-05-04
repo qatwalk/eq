@@ -9,7 +9,7 @@ from qablet_contracts.timetable import TS_EVENT_SCHEMA, py_to_ts
 from src.model.utils.bs import find_vol
 
 
-def iv_surface(ticker, model, dataset, strikes, expirations):
+def iv_surface(ticker, model, dataset, logstrikes, expirations):
     """
     Construct a volatility surface using provided qablet model and dataset as follows:
 
@@ -41,13 +41,14 @@ def iv_surface(ticker, model, dataset, strikes, expirations):
 
     asset_fwds = Forwards(dataset["ASSETS"][ticker])
 
-    iv_mat = np.zeros((len(expirations), len(strikes)))
+    iv_mat = np.zeros((len(expirations), len(logstrikes)))
     for i, exp in enumerate(expirations):
         prc_ts = dataset["PRICING_TS"]
         # Get Time in years from the millisecond timestamps
         T = (py_to_ts(exp).value - prc_ts) / (365.25 * 24 * 3600 * 1e3)
         df = discounter.discount(T)
         fwd = asset_fwds.forward(T)
+        strikes = fwd * np.exp(logstrikes)
 
         # Use a call option for strikes above forward, a put option otherwise
         is_call = strikes > fwd

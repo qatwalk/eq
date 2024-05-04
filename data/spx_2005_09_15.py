@@ -55,8 +55,8 @@ def rbergomi_data():
 
     # As of now the data below is not calibrated.
     H = 0.05
-    x_vec = [0.025, 0.025]
-    t_vec = [0.0025, 2.0]
+    xi_vec = [0.0175, 0.021]
+    t_vec = [0.0025, 0.10]
     return {
         "BASE": "USD",
         "PRICING_TS": py_to_ts(info["prc_dt"]).value,
@@ -66,7 +66,7 @@ def rbergomi_data():
             "ASSET": "SPX",
             "ALPHA": H - 0.5,
             "RHO": -0.9,
-            "XI": CubicSpline(t_vec, x_vec),
+            "XI": CubicSpline(t_vec, xi_vec),
             "ETA": 2.3,
         },
     }
