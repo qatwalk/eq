@@ -42,6 +42,9 @@ class rBergomiMCState(MCStateBase):
     """MCStateClass that implements advance and get_value methods, as needed by the Qablet MCModel interface."""
 
     def __init__(self, timetable, dataset):
+        """Fetch any information from the dataset or timetable, that needs to be stored into self,
+        to facilitate the 'advance' method to run as quickly as possible."""
+
         super().__init__(timetable, dataset)
 
         # Fetch the common model parameters from the dataset
@@ -72,7 +75,7 @@ class rBergomiMCState(MCStateBase):
         self.cur_time = 0
 
     def advance(self, new_time):
-        """Update x_vec in place when we move simulation by time dt."""
+        """Update x_vec and V in place when we move simulation by time dt."""
 
         dt = new_time - self.cur_time
         if dt < 1e-10:
