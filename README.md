@@ -10,10 +10,15 @@ though the models were calibrated to the same vanilla prices, they produced diff
 Since then, many models have appeared in the landscape, such as the Bergomi, Rough Bergomi and Rough Heston models. There have been studies on the processes, calibration methods, and their implied vol surfaces, but no comprehensive study on their impact on different exotic contracts.
 
 ## Proposal
-This repositary aims to be an open, collaborative, and growing collection of
+This repositary aims to be an open, collaborative, and growing study. It contains a number of models, with parameters [calibrated to a common volatility surface](01a_VanillaSurface.ipynb)
 
-- a number of models, with parameters [calibrated to a common volatility surface](01a_VanillaSurface.ipynb)
-- a series of notebooks, for vanillas, and different exotics such as [cliquets](02_Cliquet.ipynb), barriers, forward options and [forward collars](03_FwdCollars.ipynb), call-on-calls, and autocallables, to compare prices from each model and gain insights of their specific dynamics.
+![vanilla](images/vanilla.png)
+
+
+It contains a series of notebooks, for vanillas, and different exotics such as [cliquets](02_Cliquet.ipynb), barriers, forward options and [forward collars](03_FwdCollars.ipynb), call-on-calls, and autocallables, to compare prices from each model and gain insights of their specific dynamics.
+
+![forward collars](images/fwd_collars.png)
+
 
 We will start with a few, and we will let the models, and contracts grow over time with more contributors.
 
