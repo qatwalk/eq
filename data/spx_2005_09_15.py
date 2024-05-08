@@ -1,10 +1,18 @@
 """
 Model parameters in this file are as of 2005 September 15th.
-The SVI parameters, and heston parameters are from Gatheral.
-The local vol parameters are derived from the SVI parameters.
-The Bergomi parameters are not calibrated yet.
 
-Details of model specific data api:
+This is the same vol surface used in various illustrations in Chapter 3 and 4 by Jim Gatheral
+in his book "The Volatility Surface: A Practitioner's Guide".
+
+The fitted SVI parameters were noted from The Baruch Volatility Workshop by Gatheral
+See https://mfe.baruch.cuny.edu/wp-content/uploads/2015/06/VW4.pdf
+
+The local vol parameters are calculated from the SVI parameters.
+
+The Bergomi parameters are calibrated using a neural network trained by Romer.
+See https://github.com/qatwalk/calibration/blob/main/rbergomi/mkt_calibrate.ipynb
+
+For the qablet dataset api see
 https://qablet-academy.github.io/intro/models/mc/
 """
 
@@ -51,12 +59,24 @@ def assets_data():
 
 
 def rbergomi_data():
+    """See script header for details."""
     info = basic_info()
 
-    # As of now the data below is not calibrated.
-    H = 0.05
-    xi_vec = [0.0175, 0.021]
-    t_vec = [0.0025, 0.10]
+    # time grid points for xi used in the NN
+    tiny = 1e-6
+    t_vec = np.concatenate(
+        [
+            np.arange(0.0025, 0.0175 + tiny, 0.0025),
+            np.arange(0.02, 0.14 + tiny, 0.02),
+            np.arange(0.16, 1 + tiny, 0.12),
+            np.arange(1.25, 2 + tiny, 0.25),
+            [3],
+        ]
+    )
+    # parameters for xi
+    xi_near, xi_far, xi_decay = 0.01313237, 0.02826082, 4.9101388
+    xi_vec = xi_far + np.exp(-xi_decay * t_vec) * (xi_near - xi_far)
+
     return {
         "BASE": "USD",
         "PRICING_TS": py_to_ts(info["prc_dt"]).value,
@@ -64,10 +84,10 @@ def rbergomi_data():
         "MC": MC_PARAMS,
         "rB": {
             "ASSET": "SPX",
-            "ALPHA": H - 0.5,
-            "RHO": -0.9,
+            "ALPHA": 0.04130521 - 0.5,
+            "RHO": -0.97397541,
             "XI": CubicSpline(t_vec, xi_vec),
-            "ETA": 2.3,
+            "ETA": 2.02721794,
         },
     }
 
@@ -75,7 +95,7 @@ def rbergomi_data():
 def heston_data():
     info = basic_info()
 
-    # Heston Parameters from Gatheral.
+    # See script header.
     return {
         "BASE": "USD",
         "PRICING_TS": py_to_ts(info["prc_dt"]).value,
@@ -95,7 +115,7 @@ def heston_data():
 def localvol_data():
     info = basic_info()
 
-    # SVI Parameters are from Gatheral.
+    # Fit local vol to the SVI Parameters on file.
     kmin, kmax, dk = -5.0, 5.0, 0.05
     t_vec = np.concatenate(
         (
