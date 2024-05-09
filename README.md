@@ -15,9 +15,13 @@ This repositary aims to be an open, collaborative, and growing study. It contain
 ![vanilla](images/vanilla.png)
 
 
-It contains a series of notebooks, for vanillas, and different exotics such as [cliquets](02_Cliquet.ipynb), barriers, forward options and [forward collars](03_FwdCollars.ipynb), call-on-calls, and autocallables, to compare prices from each model and gain insights of their specific dynamics.
+It contains a series of notebooks, for vanillas, and different exotics such as [cliquets](02_Cliquet.ipynb), barriers, forward options and [forward collars](03b_FwdCollars.ipynb), call-on-calls, and autocallables, to compare prices from each model and gain insights of their specific dynamics.
 
-![forward collars](images/fwd_collars.png)
+
+<table><tr>
+<td> <img src="images/fwd collar.png" alt="forward collar"/> </td>
+<td> <img src="images/collar.png" alt="collar"/> </td>
+</tr></table>
 
 
 We will start with a few, and we will let the models, and contracts grow over time with more contributors.
