@@ -1,18 +1,9 @@
 """
 Model parameters in this file are as of 2005 September 15th.
 
-This is the same vol surface used in various illustrations in Chapter 3 and 4 by Jim Gatheral
-in his book "The Volatility Surface: A Practitioner's Guide".
+See the README.md in this folder for details on the data.
 
-The fitted SVI parameters were noted from The Baruch Volatility Workshop by Gatheral
-See https://mfe.baruch.cuny.edu/wp-content/uploads/2015/06/VW4.pdf
-
-The local vol parameters are calculated from the SVI parameters.
-
-The Bergomi parameters are calibrated using a neural network trained by Romer.
-See https://github.com/qatwalk/calibration/blob/main/rbergomi/mkt_calibrate.ipynb
-
-For the qablet dataset api see
+The `_data` methods return a qablet dataset. See qablet dataset api in
 https://qablet-academy.github.io/intro/models/mc/
 """
 

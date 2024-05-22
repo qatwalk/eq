@@ -30,7 +30,7 @@ We will start with a few, and we will let the models, and contracts grow over ti
 You can contribute by
 
 - writing new models (e.g. see [Bergomi](src/model/rbergomi.py))
-- writing new contracts, (e.g. see [forward collars](03_FwdCollars.ipynb))
+- writing new contracts, (e.g. see [forward collars](03b_FwdCollars.ipynbipynb))
 - calibration methods
 
-Start by looking at the [discussions](https://github.com/qatwalk/eq/discussions)
+Start by looking at the [discussions](https://github.com/qatwalk/eq/discussions) and [issues](https://github.com/qatwalk/eq/issues).
