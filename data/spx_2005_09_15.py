@@ -10,10 +10,9 @@ https://qablet-academy.github.io/intro/models/mc/
 from datetime import datetime
 
 import numpy as np
+import pandas as pd
 from qablet_contracts.timetable import py_to_ts
-from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import CubicSpline
-from src.model.utils.svi import svi_local_vol
 
 MC_PARAMS = {
     "PATHS": 100_000,
@@ -106,31 +105,12 @@ def heston_data():
 def localvol_data():
     info = basic_info()
 
-    # Fit local vol to the SVI Parameters on file.
-    kmin, kmax, dk = -5.0, 5.0, 0.05
-    t_vec = np.concatenate(
-        (
-            np.arange(0.0, 0.05 - 1e-6, 0.01),
-            np.arange(0.05, 0.2 - 1e-6, 0.025),
-            np.arange(0.2, 1.5 - 1e-6, 0.1),
-        )
-    )
-    times, strikes, vols = svi_local_vol(
-        "data/spx_svi_2005_09_15.csv",
-        kmin=kmin,
-        kmax=kmax,
-        dk=dk,
-        t_vec=t_vec,
-    )
-
-    volinterp = RegularGridInterpolator(
-        (times, strikes), vols, fill_value=None, bounds_error=False
-    )
+    svidf = pd.read_csv("data/spx_svi_2005_09_15.csv")
 
     return {
         "BASE": "USD",
         "PRICING_TS": py_to_ts(info["prc_dt"]).value,
         "ASSETS": assets_data(),
         "MC": MC_PARAMS,
-        "LV": {"ASSET": "SPX", "VOL": volinterp},
+        "LV": {"ASSET": "SPX", "VOL": svidf},
     }

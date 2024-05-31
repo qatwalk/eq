@@ -6,6 +6,7 @@ import numpy as np
 import pyarrow as pa
 from qablet.base.utils import Forwards, discounter_from_dataset
 from qablet_contracts.timetable import TS_EVENT_SCHEMA, py_to_ts
+
 from src.model.utils.bs import find_vol
 
 
