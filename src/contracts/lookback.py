@@ -10,7 +10,7 @@ from qablet.black_scholes.mc import LVMCModel
 def lookback_put_timetable(ticker, k, spot, start_date, maturity, num_points):
     
     start_date = pd.to_datetime(start_date)
-    days_to_maturity = maturity_term * 365.25
+    days_to_maturity = T * 365.25
     maturity = start_date + timedelta(days=days_to_maturity)
     
     fix_dates = pd.date_range(start=start_date, end=maturity, periods=num_points)
