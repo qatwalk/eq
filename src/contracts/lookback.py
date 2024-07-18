@@ -1,19 +1,18 @@
 import numpy as np
 import pandas as pd
 import pyarrow as pa
-from datetime import datetime, timedelta
-from qablet_contracts.timetable import py_to_ts
+from datetime import timedelta
 from qablet_contracts.timetable import TS_EVENT_SCHEMA
-from qablet.black_scholes.mc import LVMCModel
 
 # Creating a look-back put option timetable with custom lookbacks
-def lookback_put_timetable(ticker, k, spot, start_date, maturity, num_points):
+def lookback_put_timetable(ticker, k, spot, start_date, T, num_points):
     
     start_date = pd.to_datetime(start_date)
     days_to_maturity = T * 365.25
     maturity = start_date + timedelta(days=days_to_maturity)
     
-    fix_dates = pd.date_range(start=start_date, end=maturity, periods=num_points)
+    # find fixing dates, including the start date, but not the maturity date.
+    fix_dates = pd.date_range(start=start_date, end=maturity, periods=num_points + 1, inclusive="left")
     events = [
         {
             "track": "",
@@ -47,8 +46,8 @@ def lookback_put_timetable(ticker, k, spot, start_date, maturity, num_points):
     
     # Defining fixed strike look-back put payoff function
     def lookback_put_pay_fn(inputs):
-        [s_min] = inputs
-        return [np.maximum(k - s_min, 0)]
+        [ticker, s_max] = inputs
+        return [np.maximum(s_max - ticker, 0)]
     
     events_table = pa.RecordBatch.from_pylist(events, schema=TS_EVENT_SCHEMA)
     return {
@@ -56,20 +55,32 @@ def lookback_put_timetable(ticker, k, spot, start_date, maturity, num_points):
         "expressions": {
             "LOOKBACK": {
                 "type": "phrase",
-                "inp": ["MIN_PRICE"],
+                "inp": [ticker, "MAX_SPOT"],
                 "fn": lookback_put_pay_fn,
             },
             "UPDATE": {
                 "type": "snapper",
-                "inp": [ticker, "MIN_PRICE"],
-                "fn": lambda inputs: [np.minimum(inputs[0], inputs[1])],
-                "out": ["MIN_PRICE"],
+                "inp": [ticker, "MAX_SPOT"],
+                "fn": lambda inputs: [np.maximum(inputs[0], inputs[1])],
+                "out": ["MAX_SPOT"],
             },
             "INIT": {
                 "type": "snapper",
                 "inp": [],
                 "fn": lambda inputs: [spot],
-                "out": ["MIN_PRICE"],
+                "out": ["MAX_SPOT"],
             },
         },
     }
+
+if __name__ == "__main__":
+    ticker = "SPX"
+    k = 100
+    spot=100
+    start_date = '2005-09-14'
+    T= 0.2
+    num_points = 4  
+
+    # Creating a look-back put option timetable
+    timetable = lookback_put_timetable(ticker, k,spot, start_date, T, num_points)
+    print(timetable["events"].to_pandas())
