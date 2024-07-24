@@ -18,11 +18,16 @@ This repositary aims to be an open, collaborative, and growing study. It contain
 It contains a series of notebooks, for different contracts such as [cliquets](02_Cliquet.ipynb), [collars](03a_Collars.ipynb), [forward collars](03b_FwdCollars.ipynb), and [lookback options](04b_Lookbacks_Model_Prices.ipynb), to compare prices from each model and gain insights of their specific dynamics.
 
 
-<table><tr>
+<table>
+<tr>
 <td> <img src="images/collar.png" alt="collar"/> </td>
 <td> <img src="images/fwd collar.png" alt="forward collar"/> </td>
+</tr>
+<tr>
 <td> <img src="images/lookback_put.png" alt="lookback"/> </td>
-</tr></table>
+<td> <img src="images/cliquet.png" alt="cliquet"/> </td>
+</tr>
+</table>
 
 
 We have started with a few, and we will let the models, and contracts grow over time with more contributors.
