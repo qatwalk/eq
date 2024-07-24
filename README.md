@@ -19,8 +19,9 @@ It contains a series of notebooks, for vanillas, and different exotics such as [
 
 
 <table><tr>
-<td> <img src="images/fwd collar.png" alt="forward collar"/> </td>
 <td> <img src="images/collar.png" alt="collar"/> </td>
+<td> <img src="images/fwd collar.png" alt="forward collar"/> </td>
+<td> <img src="images/lookback_put.png" alt="lookback"/> </td>
 </tr></table>
 
 
