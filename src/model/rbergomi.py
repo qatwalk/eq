@@ -67,42 +67,46 @@ class rBergomiMCState(MCStateBase):
         self.X = np.zeros((self.n, 1000))
         self.k = 0  # step counter
         self.mean = np.array([0, 0])
+        self.cov = cov(self.a, self.dt)
 
         self.v_time = 0  # when V was updated
         self.x_time = 0  # when x_vec was updated, always on or after v_time
         self.x_vec = np.zeros(self.n)  # log stock process
 
-        # generate two sets of random numbers for the hybrid scheme for variance
-        self.dwv = self.rng.multivariate_normal(
-            self.mean, cov(self.a, self.dt), self.n
-        )
-        # and one set for stock, correlated to dwv[:, 0]
+        self.gen_rands()
+
+    def gen_rands(self):
+        """Create random numbers for the next time step."""
+        # two sets for the hybrid scheme for variance
+        self.dwv = self.rng.multivariate_normal(self.mean, self.cov, self.n)
+        # one set for stock, correlated to dwv[:, 0]
         dws = self.rng.normal(0, np.sqrt(self.dt) * self.rho_comp, self.n)
         dws += self.rho * self.dwv[:, 0]
         self.x_diff = np.sqrt(self.V) * dws - self.V / 2.0 * self.dt
 
+    def advance_x_vec(self, new_time):
+        """Update the log stock process."""
+        fwd_rate = self.asset_fwd.rate(new_time, self.x_time)
+        self.x_vec += fwd_rate * (new_time - self.x_time)
+        self.x_vec += self.x_diff * (new_time - self.x_time) / self.dt
+        self.x_time = new_time
+
     def advance(self, new_time):
         """Update x_vec and V in place when we move simulation by time dt."""
-
-        if new_time < self.x_time + 1e-10:
-            return
 
         while new_time > self.v_time + self.dt:
             # update both x_vec and V by one timestep (dt)
             new_v_time = self.v_time + self.dt
 
-            # Update the log stock process first,
-            fwd_rate = self.asset_fwd.rate(new_v_time, self.x_time)
-            self.x_vec += fwd_rate * (new_v_time - self.x_time)
-            self.x_vec += self.x_diff * (new_v_time - self.x_time) / self.dt
+            # Update the log stock process
+            self.advance_x_vec(new_v_time)
 
             # One part of variance: Riemann sums using convolution
-            # Construct arrays for convolution
             self.X[:, self.k] = self.dwv[:, 0]  # append to X history
 
             if self.k > 0:  # append to G history
                 self.G[self.k + 1] = g(b(self.k + 1, self.a) * self.dt, self.a)
-            print(self.G[self.k + 1])
+
             # Convolution
             Y = np.matmul(self.X[:, : self.k], self.G[self.k + 1 : 1 : -1])
             self.k += 1
@@ -117,24 +121,11 @@ class rBergomiMCState(MCStateBase):
                 - 0.5 * self.eta**2 * new_v_time ** (2 * self.a + 1)
             )
 
-            # generate two sets of random numbers for the hybrid scheme for variance
-            self.dwv = self.rng.multivariate_normal(
-                self.mean, cov(self.a, self.dt), self.n
-            )
-            # and one set for stock, correlated to dwv[:, 0]
-            dws = self.rng.normal(0, np.sqrt(self.dt) * self.rho_comp, self.n)
-            dws += self.rho * self.dwv[:, 0]
-            self.x_diff = np.sqrt(self.V) * dws - self.V / 2.0 * self.dt
-
+            self.gen_rands()
             self.v_time = new_v_time
-            self.x_time = new_v_time
 
         if new_time > self.x_time + 1e-10:
-            # Update the log stock process
-            fwd_rate = self.asset_fwd.rate(new_time, self.x_time)
-            self.x_vec += fwd_rate * (new_time - self.x_time)
-            self.x_vec += self.x_diff * (new_time - self.x_time) / self.dt
-            self.x_time = new_time
+            self.advance_x_vec(new_time)
 
     def get_value(self, unit):
         """Return the value of the unit at the current time."""
