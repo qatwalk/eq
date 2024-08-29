@@ -6,9 +6,9 @@ SVI parameters and calculates local volatility using Dupire's formula.
 from math import sqrt
 
 import numpy as np
+from finmc.models.base import MCFixedStep
+from finmc.utils.assets import Discounter, Forwards
 from numpy.random import SFC64, Generator
-from qablet.base.mc import MCModel, MCStateBase
-from qablet.base.utils import Forwards
 from scipy.interpolate import RegularGridInterpolator, interp1d
 
 
@@ -66,18 +66,20 @@ def _svi_local_var_step(k, dk, t0, t1, w_vec_prev, w_vec):
 
 
 # Define a class for the state of a single asset BS Local Vol MC process
-class LVMCState(MCStateBase):
-    def __init__(self, timetable, dataset):
-        super().__init__(timetable, dataset)
-
+class LVMC(MCFixedStep):
+    def reset(self):
         # fetch the model parameters from the dataset
-        self.n = dataset["MC"]["PATHS"]
-        self.asset = dataset["LV"]["ASSET"]
-        self.asset_fwd = Forwards(dataset["ASSETS"][self.asset])
+        self.n = self.dataset["MC"]["PATHS"]
+        self.asset = self.dataset["LV"]["ASSET"]
+        self.asset_fwd = Forwards(self.dataset["ASSETS"][self.asset])
         self.spot = self.asset_fwd.forward(0)
+        self.discounter = Discounter(
+            self.dataset["ASSETS"][self.dataset["BASE"]]
+        )
+        self.timestep = self.dataset["MC"]["TIMESTEP"]
 
         # initialize states related to local vol calibration
-        svi_df = dataset["LV"]["VOL"]
+        svi_df = self.dataset["LV"]["VOL"]
         kmin, kmax, dk = -5.0, 5.0, 0.025
         self.dk = dk
         self.k_vec = np.arange(kmin - dk, kmax + dk + dk / 2, dk)
@@ -86,7 +88,7 @@ class LVMCState(MCStateBase):
         self.w_vec_prev = np.zeros(len(self.k_vec))
 
         # Initialize rng and any arrays
-        self.rng = Generator(SFC64(dataset["MC"]["SEED"]))
+        self.rng = Generator(SFC64(self.dataset["MC"]["SEED"]))
         self.x_vec = np.zeros(self.n)  # process x (log stock)
         self.dz_vec = np.empty(self.n, dtype=np.float64)
         self.tmp = np.empty(self.n, dtype=np.float64)
@@ -113,14 +115,12 @@ class LVMCState(MCStateBase):
         self.w_vec_prev = w_vec
         return interp(self.x_vec - logfwd_shift)
 
-    def advance(self, new_time):
+    def step(self, new_time):
         """Update x_vec in place when we move simulation by time dt."""
 
         dt = new_time - self.cur_time
-        if dt < 1e-10:
-            return
-        fwd_rate = self.asset_fwd.rate(new_time, self.cur_time)
 
+        fwd_rate = self.asset_fwd.rate(new_time, self.cur_time)
         vol = self._advance_vol(self.cur_time, new_time)
 
         # # generate the random numbers and advance the log stock process
@@ -145,7 +145,5 @@ class LVMCState(MCStateBase):
         if unit == self.asset:
             return self.spot * np.exp(self.x_vec)
 
-
-class LVMCModel(MCModel):
-    def state_class(self):
-        return LVMCState
+    def get_df(self):
+        return self.discounter.discount(self.cur_time)

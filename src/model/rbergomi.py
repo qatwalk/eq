@@ -6,9 +6,9 @@ Finance and Stochastics, 21(4): 931-965, 2017.
 """
 
 import numpy as np
+from finmc.models.base import MCBase
+from finmc.utils.assets import Discounter, Forwards
 from numpy.random import SFC64, Generator
-from qablet.base.mc import MCModel, MCStateBase
-from qablet.base.utils import Forwards
 
 
 def g(x, a):
@@ -33,32 +33,33 @@ def cov(a, dt):
     return cov
 
 
-class rBergomiMCState(MCStateBase):
+class rBergomiMC(MCBase):
     """MCStateClass that implements advance and get_value methods, as needed by the Qablet MCModel interface."""
 
-    def __init__(self, timetable, dataset):
+    def reset(self):
         """Fetch any information from the dataset or timetable, that needs to be stored into self,
         to facilitate the 'advance' method to run as quickly as possible."""
 
-        super().__init__(timetable, dataset)
-
         # Fetch the common model parameters from the dataset
-        self.n = dataset["MC"]["PATHS"]
-        self.asset = dataset["rB"]["ASSET"]
-        self.asset_fwd = Forwards(dataset["ASSETS"][self.asset])
+        self.n = self.dataset["MC"]["PATHS"]
+        self.asset = self.dataset["rB"]["ASSET"]
+        self.asset_fwd = Forwards(self.dataset["ASSETS"][self.asset])
         self.spot = self.asset_fwd.forward(0)
+        self.discounter = Discounter(
+            self.dataset["ASSETS"][self.dataset["BASE"]]
+        )
 
         # Fetch the rBergomi parameters from the dataset
-        self.a = dataset["rB"]["ALPHA"]
-        self.rho = dataset["rB"]["RHO"]
+        self.a = self.dataset["rB"]["ALPHA"]
+        self.rho = self.dataset["rB"]["RHO"]
         self.rho_comp = np.sqrt(1 - self.rho**2)
-        self.xi = dataset["rB"]["XI"]
-        self.eta = dataset["rB"]["ETA"]
+        self.xi = self.dataset["rB"]["XI"]
+        self.eta = self.dataset["rB"]["ETA"]
 
         self.dt = 1 / 250  # vol time step, currently hardcoded.
 
         # Initialize rng, and log stock and variance processes
-        self.rng = Generator(SFC64(dataset["MC"]["SEED"]))
+        self.rng = Generator(SFC64(self.dataset["MC"]["SEED"]))
         self.V = np.zeros(self.n)  # variance process
         self.V.fill(self.xi(0))
 
@@ -132,10 +133,6 @@ class rBergomiMCState(MCStateBase):
 
         if unit == self.asset:
             return self.spot * np.exp(self.x_vec)
-        else:
-            return None
 
-
-class rBergomiMCModel(MCModel):
-    def state_class(self):
-        return rBergomiMCState
+    def get_df(self):
+        return self.discounter.discount(self.cur_time)

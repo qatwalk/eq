@@ -10,3 +10,4 @@ nbmake
 ruff
 nb-clean
 line_profiler
+finmc

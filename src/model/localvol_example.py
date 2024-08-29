@@ -6,7 +6,8 @@ from datetime import datetime
 
 import numpy as np
 import pandas as pd
-from localvol import LVMCModel
+from localvol import LVMC
+from qablet.base.mc import MCPricer
 from qablet_contracts.eq.vanilla import Option
 from qablet_contracts.timetable import py_to_ts
 
@@ -46,7 +47,7 @@ def run_model():
     ).timetable()
 
     # Create model and price the option
-    model = LVMCModel()
+    model = MCPricer(LVMC)
     return model.price(opt_timetable, dataset)
 
 

@@ -97,7 +97,7 @@ def heston_data():
             "ASSET": "SPX",
             "INITIAL_VAR": 0.0174,
             "LONG_VAR": 0.0354,
-            "VOL_OF_VAR": 0.3877,
+            "VOL_OF_VOL": 0.3877,
             "MEANREV": 1.3253,
             "CORRELATION": -0.7165,
         },

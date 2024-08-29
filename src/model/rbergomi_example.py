@@ -5,9 +5,10 @@ An example to try the rBergomi model with a Vanilla Option contract.
 from datetime import datetime
 
 import numpy as np
+from qablet.base.mc import MCPricer
 from qablet_contracts.eq.vanilla import Option
 from qablet_contracts.timetable import py_to_ts
-from rbergomi import rBergomiMCModel
+from rbergomi import rBergomiMC
 from scipy.interpolate import CubicSpline
 
 
@@ -50,7 +51,7 @@ def run_model():
     ).timetable()
 
     # Create model and price the option
-    model = rBergomiMCModel()
+    model = MCPricer(rBergomiMC)
     return model.price(opt_timetable, dataset)
 
 
