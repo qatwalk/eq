@@ -67,13 +67,11 @@ def rbergomi_data():
     xi_near, xi_far, xi_decay = 0.01313237, 0.02826082, 4.9101388
     xi_vec = xi_far + np.exp(-xi_decay * t_vec) * (xi_near - xi_far)
 
-    mc_params = MC_PARAMS.copy()
-    mc_params["TIMESTEP"] = 1000
     return {
         "BASE": "USD",
         "PRICING_TS": py_to_ts(info["prc_dt"]).value,
         "ASSETS": assets_data(),
-        "MC": mc_params,
+        "MC": MC_PARAMS,
         "rB": {
             "ASSET": "SPX",
             "ALPHA": 0.04130521 - 0.5,

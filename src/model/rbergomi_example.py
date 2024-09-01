@@ -29,7 +29,7 @@ def run_model():
         "ASSETS": {"USD": discount_data, ticker: fwd_data},
         "MC": {
             "PATHS": 100_000,
-            "TIMESTEP": 1000,
+            "TIMESTEP": 1 / 250,
             "SEED": 1,
         },
         "rB": {

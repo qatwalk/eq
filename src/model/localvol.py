@@ -70,13 +70,14 @@ class LVMC(MCFixedStep):
     def reset(self):
         # fetch the model parameters from the dataset
         self.n = self.dataset["MC"]["PATHS"]
+        self.timestep = self.dataset["MC"]["TIMESTEP"]
+
         self.asset = self.dataset["LV"]["ASSET"]
         self.asset_fwd = Forwards(self.dataset["ASSETS"][self.asset])
         self.spot = self.asset_fwd.forward(0)
         self.discounter = Discounter(
             self.dataset["ASSETS"][self.dataset["BASE"]]
         )
-        self.timestep = self.dataset["MC"]["TIMESTEP"]
 
         # initialize states related to local vol calibration
         svi_df = self.dataset["LV"]["VOL"]

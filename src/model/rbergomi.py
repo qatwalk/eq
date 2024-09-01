@@ -42,6 +42,8 @@ class rBergomiMC(MCBase):
 
         # Fetch the common model parameters from the dataset
         self.n = self.dataset["MC"]["PATHS"]
+        self.timestep = self.dataset["MC"]["TIMESTEP"]
+
         self.asset = self.dataset["rB"]["ASSET"]
         self.asset_fwd = Forwards(self.dataset["ASSETS"][self.asset])
         self.spot = self.asset_fwd.forward(0)
@@ -56,8 +58,6 @@ class rBergomiMC(MCBase):
         self.xi = self.dataset["rB"]["XI"]
         self.eta = self.dataset["rB"]["ETA"]
 
-        self.dt = 1 / 250  # vol time step, currently hardcoded.
-
         # Initialize rng, and log stock and variance processes
         self.rng = Generator(SFC64(self.dataset["MC"]["SEED"]))
         self.V = np.zeros(self.n)  # variance process
@@ -68,7 +68,7 @@ class rBergomiMC(MCBase):
         self.X = np.zeros((self.n, 1000))
         self.k = 0  # step counter
         self.mean = np.array([0, 0])
-        self.cov = cov(self.a, self.dt)
+        self.cov = cov(self.a, self.timestep)
 
         self.v_time = 0  # when V was updated
         self.x_time = 0  # when x_vec was updated, always on or after v_time
@@ -81,23 +81,25 @@ class rBergomiMC(MCBase):
         # two sets for the hybrid scheme for variance
         self.dwv = self.rng.multivariate_normal(self.mean, self.cov, self.n)
         # one set for stock, correlated to dwv[:, 0]
-        dws = self.rng.normal(0, np.sqrt(self.dt) * self.rho_comp, self.n)
+        dws = self.rng.normal(
+            0, np.sqrt(self.timestep) * self.rho_comp, self.n
+        )
         dws += self.rho * self.dwv[:, 0]
-        self.x_diff = np.sqrt(self.V) * dws - self.V / 2.0 * self.dt
+        self.x_diff = np.sqrt(self.V) * dws - self.V / 2.0 * self.timestep
 
     def advance_x_vec(self, new_time):
         """Update the log stock process."""
         fwd_rate = self.asset_fwd.rate(new_time, self.x_time)
         self.x_vec += fwd_rate * (new_time - self.x_time)
-        self.x_vec += self.x_diff * (new_time - self.x_time) / self.dt
+        self.x_vec += self.x_diff * (new_time - self.x_time) / self.timestep
         self.x_time = new_time
 
     def advance(self, new_time):
         """Update x_vec and V in place when we move simulation by time dt."""
 
-        while new_time > self.v_time + self.dt:
+        while new_time > self.v_time + self.timestep:
             # update both x_vec and V by one timestep (dt)
-            new_v_time = self.v_time + self.dt
+            new_v_time = self.v_time + self.timestep
 
             # Update the log stock process
             self.advance_x_vec(new_v_time)
@@ -106,7 +108,9 @@ class rBergomiMC(MCBase):
             self.X[:, self.k] = self.dwv[:, 0]  # append to X history
 
             if self.k > 0:  # append to G history
-                self.G[self.k + 1] = g(b(self.k + 1, self.a) * self.dt, self.a)
+                self.G[self.k + 1] = g(
+                    b(self.k + 1, self.a) * self.timestep, self.a
+                )
 
             # Convolution
             Y = np.matmul(self.X[:, : self.k], self.G[self.k + 1 : 1 : -1])
