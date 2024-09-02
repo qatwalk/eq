@@ -9,7 +9,6 @@ import numpy as np
 from finmc.models.base import MCFixedStep
 from finmc.utils.assets import Discounter, Forwards
 from numpy.random import SFC64, Generator
-from scipy.interpolate import RegularGridInterpolator, interp1d
 
 
 def svi(params, k):
@@ -20,22 +19,40 @@ def svi(params, k):
     return w
 
 
-def get_w_interp(k_vec, svi_df):
-    """Create an interpolator of total variances by t and k."""
-    texp_vec = svi_df["texp"]
+class SVItoLV:
+    def __init__(self, k_vec, svi_df):
+        """Create a 2-D array of total variances (ws) by t and k."""
+        self.t_vec = svi_df["texp"]
+        self.k_vec = k_vec
+        self.t_len = len(self.t_vec)
 
-    ws = np.zeros((len(texp_vec) + 1, len(k_vec)))  # initialize
+        self.ws = np.zeros((len(self.t_vec), len(k_vec)))
+        for i, t in enumerate(self.t_vec):
+            self.ws[i] = svi(svi_df.loc[i], k_vec)
 
-    # let ws[0] be zero, update ws[1:]
-    for i, t in enumerate(texp_vec):
-        ws[i + 1] = svi(svi_df.loc[i], k_vec)
+    def total_var(self, t):
+        """Return the total variance vector at time t."""
 
-    return RegularGridInterpolator(
-        ([0.0] + texp_vec.to_list(), k_vec),
-        ws,
-        fill_value=None,
-        bounds_error=False,
-    )
+        i_left = np.searchsorted(self.t_vec, t, side="left")
+        i_right = np.searchsorted(self.t_vec, t, side="right")
+
+        if i_left == i_right:
+            if i_right == 0:
+                w = self.ws[0] * (t / self.t_vec[0])
+            elif i_right == self.t_len:
+                w = self.ws[-1]  # Consider extrapolation using the last slope
+            else:
+                i_left -= 1
+                t_right = self.t_vec[i_right]
+                t_left = self.t_vec[i_left]
+                den = t_right - t_left
+                w = (
+                    self.ws[i_left]
+                    + (self.ws[i_right] - self.ws[i_left]) * (t - t_left) / den
+                )
+        else:
+            w = self.ws[i_left]
+        return w
 
 
 def _svi_local_var_step(k, dk, t0, t1, w_vec_prev, w_vec):
@@ -84,7 +101,7 @@ class LVMC(MCFixedStep):
         kmin, kmax, dk = -5.0, 5.0, 0.025
         self.dk = dk
         self.k_vec = np.arange(kmin - dk, kmax + dk + dk / 2, dk)
-        self.w_interp = get_w_interp(self.k_vec, svi_df)
+        self.svi_lv = SVItoLV(self.k_vec, svi_df)
         self.logspot = np.log(self.spot)
         self.w_vec_prev = np.zeros(len(self.k_vec))
 
@@ -101,7 +118,7 @@ class LVMC(MCFixedStep):
         fwd = self.asset_fwd.forward(prev_time)
         logfwd_shift = np.log(fwd) - self.logspot
 
-        w_vec = self.w_interp((new_time, self.k_vec))
+        w_vec = self.svi_lv.total_var(new_time)
         lvar = _svi_local_var_step(
             self.k_vec,
             self.dk,
@@ -111,10 +128,9 @@ class LVMC(MCFixedStep):
             w_vec,
         )
         vol_by_k = np.sqrt(lvar)
-        interp = interp1d(self.k_vec[1:-1], vol_by_k)
 
         self.w_vec_prev = w_vec
-        return interp(self.x_vec - logfwd_shift)
+        return np.interp(self.x_vec - logfwd_shift, self.k_vec[1:-1], vol_by_k)
 
     def step(self, new_time):
         """Update x_vec in place when we move simulation by time dt."""
