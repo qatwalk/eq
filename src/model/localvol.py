@@ -19,16 +19,57 @@ def svi(params, k):
     return w
 
 
+class UniformGridInterp:
+    """Helper class to interpolate, when x-array is uniformly spaced.
+    This avoids the cost of index search in arbitrary x-array."""
+
+    def __init__(self, xmin=-3.0, xmax=3.0, dx=0.01):
+        """Initialize the x-range and allocate some arrays."""
+
+        self.dx = dx
+        self.xmin = xmin
+        self.x_vec = np.arange(xmin, xmax + dx / 2, dx)
+        self.xlen = len(self.x_vec)
+
+        # Pre-allocate arrays
+        self.slope = np.zeros(self.xlen)
+
+    def interp(self, x_vec, y_vec, out):
+        """Interpolate y_vec at x_vec and store the result in out."""
+
+        # Find the left index of the interval containing x: idx = floor((x - xmin) / dx)
+        # Reusing the out array as a temp array, as it is the same shape
+        np.subtract(x_vec, self.xmin, out=out)
+        np.divide(out, self.dx, out=out)
+        idx = out.astype(int)
+
+        # Clip the index to [0, xlen - 1]
+        np.clip(idx, 0, self.xlen - 1, out=idx)
+
+        # get slope of y in each interval
+        np.subtract(y_vec[1:], y_vec[:-1], out=self.slope[:-1])
+        self.slope[-1] = self.slope[-2]
+        np.divide(self.slope, self.dx, out=self.slope)
+
+        # y = (x - left) * slope + left
+        np.subtract(x_vec, self.x_vec[idx], out=out)  # x - left
+        np.multiply(out, self.slope[idx], out=out)  # * slope
+        np.add(out, y_vec[idx], out=out)  # + left
+
+
 class SVItoLV:
     """Helper class to convert SVI parameters to local volatility."""
 
-    def __init__(self, svi_df):
+    def __init__(self, svi_df, shape):
         """Create a 2-D array of total variances (ws) by t and k.
         The knots in t are the same as in the input svi_df."""
-        kmin, kmax, dk = -5.0, 5.0, 0.025
-        self.dk = dk
-        self.k_vec = np.arange(kmin - dk, kmax + dk + dk / 2, dk)
-        self.k_vec_prime = self.k_vec[1:-1]
+        self.ugi = UniformGridInterp()
+        self.k_vec = np.pad(self.ugi.x_vec, 1)  # one more point on each side
+        self.dk = self.ugi.dx
+        self.k_vec[0] = self.k_vec[1] - self.dk
+        self.k_vec[-1] = self.k_vec[-2] + self.dk
+
+        self.vol = np.zeros(shape)  # vol for each path
 
         self.t_vec = svi_df["texp"]
         self.t_len = len(self.t_vec)
@@ -64,8 +105,9 @@ class SVItoLV:
             w = self.ws[i_left]
         return w
 
-    def local_vol(self, prev_time, new_time):
-        """Advance w_vec to new_time and return the local volatility vector between prev_time and new time."""
+    def advance_vol(self, prev_time, new_time, x_vec):
+        """Advance w_vec to new_time and stores the local volatility between prev_time and new time.
+        Returns the local volatility for the given x_vec."""
         w_vec = self.total_var(new_time)
         lvar = self._svi_local_var_step(
             prev_time,
@@ -75,7 +117,8 @@ class SVItoLV:
         )
 
         self.w_vec_prev = w_vec
-        return np.sqrt(lvar)
+        lvol = np.sqrt(lvar)  # vol by strike grid
+        self.ugi.interp(x_vec, lvol, out=self.vol)  # get vol by path
 
     def _svi_local_var_step(self, t0, t1, w_vec_prev, w_vec):
         """Calculate local variance (vol**2) from t0 to t1, given a list of strikes k, uniformly spaced by dk,
@@ -119,7 +162,7 @@ class LVMC(MCFixedStep):
         )
 
         # initialize helper for local vol calibration
-        self.svi_lv = SVItoLV(self.dataset["LV"]["VOL"])
+        self.localvol = SVItoLV(self.dataset["LV"]["VOL"], self.n)
         self.logspot = np.log(self.spot)
 
         # Initialize rng and any arrays
@@ -137,18 +180,19 @@ class LVMC(MCFixedStep):
         fwd_rate = self.asset_fwd.rate(new_time, self.cur_time)
 
         # Get local vol, from current time to new time)
-        logfwd_shift = self.asset_fwd.log_forward_fn(new_time) - self.logspot
+        logfwd_shift = (
+            self.asset_fwd.log_forward_fn(self.cur_time) - self.logspot
+        )
         np.subtract(self.x_vec, logfwd_shift, out=self.tmp)
-        vol_by_k = self.svi_lv.local_vol(self.cur_time, new_time)
-        vol = np.interp(self.tmp, self.svi_lv.k_vec_prime, vol_by_k)
+        self.localvol.advance_vol(self.cur_time, new_time, self.tmp)
 
         # # generate the random numbers and advance the log stock process
         self.rng.standard_normal(self.n, out=self.dz_vec)
         self.dz_vec *= sqrt(dt)
-        self.dz_vec *= vol
+        self.dz_vec *= self.localvol.vol
 
         # add drift to x_vec: (fwd_rate - vol * vol / 2.0) * dt
-        np.multiply(vol, vol, out=self.tmp)
+        np.multiply(self.localvol.vol, self.localvol.vol, out=self.tmp)
         self.tmp *= -0.5 * dt
         self.tmp += fwd_rate * dt
         self.x_vec += self.tmp
