@@ -19,34 +19,66 @@ def svi(params, k):
     return w
 
 
+class UniformGridInterp:
+    """Helper class to interpolate, when x-array is uniformly spaced.
+    This avoids the cost of index search in arbitrary x-array."""
+
+    def __init__(self, xmin=-3.0, xmax=3.0, dx=0.01):
+        """Initialize the x-range and allocate some arrays."""
+
+        self.dx = dx
+        self.xmin = xmin
+        self.x_vec = np.arange(xmin, xmax + dx / 2, dx)
+        self.xlen = len(self.x_vec)
+
+        # Pre-allocate arrays
+        self.slope = np.zeros(self.xlen)
+
+    def interp(self, x_vec, y_vec, out):
+        """Interpolate y_vec at x_vec and store the result in out."""
+
+        # Find the left index of the interval containing x: idx = floor((x - xmin) / dx)
+        # Reusing the out array as a temp array, as it is the same shape
+        np.subtract(x_vec, self.xmin, out=out)
+        np.divide(out, self.dx, out=out)
+        idx = out.astype(int)
+
+        # Clip the index to [0, xlen - 1]
+        np.clip(idx, 0, self.xlen - 1, out=idx)
+
+        # get slope of y in each interval
+        np.subtract(y_vec[1:], y_vec[:-1], out=self.slope[:-1])
+        self.slope[-1] = self.slope[-2]
+        np.divide(self.slope, self.dx, out=self.slope)
+
+        # y = (x - left) * slope + left
+        np.subtract(x_vec, self.x_vec[idx], out=out)  # x - left
+        np.multiply(out, self.slope[idx], out=out)  # * slope
+        np.add(out, y_vec[idx], out=out)  # + left
+
+
 class SVItoLV:
     """Helper class to convert SVI parameters to local volatility."""
 
     def __init__(self, svi_df, shape):
         """Create a 2-D array of total variances (ws) by t and k.
         The knots in t are the same as in the input svi_df."""
-        kmin, kmax, dk = -4.0, 4.0, 0.02
-        self.dk = dk
-        self.kmin = kmin
-        self.kmax = kmax
-        self.k_vec_plus = np.arange(kmin - dk, kmax + dk + dk / 2, dk)
-        self.k_vec = self.k_vec_plus[1:-1]
-        self.klen = len(self.k_vec)
-        self.slope = np.zeros(self.klen)
+        self.ugi = UniformGridInterp()
+        self.k_vec = np.pad(self.ugi.x_vec, 1)  # one more point on each side
+        self.dk = self.ugi.dx
+        self.k_vec[0] = self.k_vec[1] - self.dk
+        self.k_vec[-1] = self.k_vec[-2] + self.dk
+
         self.vol = np.zeros(shape)  # vol for each path
-        self.idx = np.zeros(
-            shape, dtype=int
-        )  # strike grid index for each path
-        self.tmp = np.zeros(shape)  # temporary array for interpolation
 
         self.t_vec = svi_df["texp"]
         self.t_len = len(self.t_vec)
 
-        self.ws = np.zeros((len(self.t_vec), len(self.k_vec_plus)))
+        self.ws = np.zeros((len(self.t_vec), len(self.k_vec)))
         for i, t in enumerate(self.t_vec):
-            self.ws[i] = svi(svi_df.loc[i], self.k_vec_plus)
+            self.ws[i] = svi(svi_df.loc[i], self.k_vec)
 
-        self.w_vec_prev = np.zeros(len(self.k_vec_plus))
+        self.w_vec_prev = np.zeros(len(self.k_vec))
 
     def total_var(self, t):
         """Return the total variance (v^2 t) vector at time t
@@ -85,27 +117,8 @@ class SVItoLV:
         )
 
         self.w_vec_prev = w_vec
-        self.lvol = np.sqrt(lvar)  # vol for each grid point
-        self._k_interp(x_vec)  # interpolate vol for each path
-
-    def _k_interp(self, x_vec):
-        # Find the left index of the interval containing x
-        np.subtract(x_vec, self.kmin, out=self.tmp)
-        np.divide(self.tmp, self.dk, out=self.tmp)
-
-        # idxf = (x_vec - self.kmin) / self.dk
-        self.idx = self.tmp.astype(int)
-        np.clip(self.idx, 0, self.klen - 1, out=self.idx)
-        x_base = self.k_vec[self.idx]
-
-        # get slope of lvar from one strike to the next
-        np.subtract(self.lvol[1:], self.lvol[:-1], out=self.slope[:-1])
-        self.slope[-1] = self.slope[-2]
-        np.divide(self.slope, self.dk, out=self.slope)
-
-        np.subtract(x_vec, x_base, out=self.vol)  # xfrac
-        np.multiply(self.vol, self.slope[self.idx], out=self.vol)  # yfrac
-        np.add(self.vol, self.lvol[self.idx], out=self.vol)  # add the base
+        lvol = np.sqrt(lvar)  # vol by strike grid
+        self.ugi.interp(x_vec, lvol, out=self.vol)  # get vol by path
 
     def _svi_local_var_step(self, t0, t1, w_vec_prev, w_vec):
         """Calculate local variance (vol**2) from t0 to t1, given a list of strikes k, uniformly spaced by dk,
@@ -122,7 +135,7 @@ class SVItoLV:
 
         # drop the extra points at top and bottom
         w_ = w[1:-1]
-        k_ = self.k_vec_plus[1:-1]
+        k_ = self.k_vec[1:-1]
         wt_ = wt[1:-1]
 
         # apply Dupire's formula
