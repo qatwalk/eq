@@ -3,7 +3,8 @@ Profile the rBergomi model to find timing bottlenecks in the code.
 """
 
 from line_profiler import LineProfiler
-from localvol import SVItoLV, LVMC, UniformGridInterp as UGI
+from localvol import LVMC, SVItoLV
+from localvol import UniformGridInterp as UGI
 from localvol_example import run_model  # noqa: F401
 
 if __name__ == "__main__":

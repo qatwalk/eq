@@ -180,11 +180,11 @@ class LVMC(MCFixedStep):
         fwd_rate = self.asset_fwd.rate(new_time, self.cur_time)
 
         # Get local vol, from current time to new time)
-        logfwd_shift = self.asset_fwd.log_forward_fn(new_time) - self.logspot
+        logfwd_shift = (
+            self.asset_fwd.log_forward_fn(self.cur_time) - self.logspot
+        )
         np.subtract(self.x_vec, logfwd_shift, out=self.tmp)
         self.localvol.advance_vol(self.cur_time, new_time, self.tmp)
-        # Todo: should I use new x_vec or old?
-        # should I use new log shift or old?
 
         # # generate the random numbers and advance the log stock process
         self.rng.standard_normal(self.n, out=self.dz_vec)
