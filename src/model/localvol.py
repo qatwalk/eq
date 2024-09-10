@@ -11,12 +11,18 @@ from finmc.utils.assets import Discounter, Forwards
 from numpy.random import SFC64, Generator
 
 
-def svi(params, k):
+def svi_tvar(params, k):
     """Get total variance (v^2 t) from SVI params and log strikes."""
     k_m = k - params["m"]
     discr = np.sqrt(k_m**2 + params["sig"] ** 2)
     w = params["a"] + params["b"] * (params["rho"] * k_m + discr)
     return w
+
+
+def svi_vol(params, k):
+    """Get vol from SVI params and log strikes."""
+    w = svi_tvar(params, k)  # total variance
+    return np.sqrt(w / params["texp"])
 
 
 def dupire_local_var(dt, dk, k, w_vec_prev, w_vec):
@@ -74,7 +80,7 @@ class UniformGridInterp:
     """Helper class to interpolate, when x-array is uniformly spaced.
     This avoids the cost of index search in arbitrary x-array."""
 
-    def __init__(self, xmin=-3.0, xmax=3.0, dx=0.01):
+    def __init__(self, xmin=-6.0, xmax=6.0, dx=0.01):
         """Initialize the x-range and allocate some arrays."""
 
         self.dx = dx
@@ -125,7 +131,7 @@ class SVItoLV:
         # Create a 2-D array of total variances (ws) by t and k.
         self.ws = np.zeros((len(self.t_vec), len(self.k_vec)))
         for i, t in enumerate(self.t_vec):
-            self.ws[i] = svi(svi_df.loc[i], self.k_vec)
+            self.ws[i] = svi_tvar(svi_df.loc[i], self.k_vec)
 
         self.w_vec_prev = np.zeros(len(self.k_vec))  # total variance at t0
         self.vol = np.zeros(shape)  # pre-allocate array for vol by path
@@ -133,7 +139,10 @@ class SVItoLV:
     def advance_vol(self, prev_time, new_time, x_vec):
         """Advance w_vec to new_time and stores the local volatility between prev_time and new time.
         Returns the local volatility for the given x_vec."""
+
+        # get total variance for the strike grid,  at new_time
         w_vec = interp_vec(new_time, self.t_vec, self.ws)
+        # get local variance for the strike grid,  between prev_time and new_time
         lvar = dupire_local_var(
             new_time - prev_time,
             self.dk,
@@ -141,10 +150,10 @@ class SVItoLV:
             self.w_vec_prev,
             w_vec,
         )
-
         self.w_vec_prev = w_vec
-        lvol = np.sqrt(lvar)  # vol by strike grid
-        self.ugi.interp(x_vec, lvol, out=self.vol)  # get vol by path
+
+        # get local vol by path
+        self.ugi.interp(x_vec, np.sqrt(lvar), out=self.vol)
 
 
 # Define a class for the state of a single asset BS Local Vol MC process
