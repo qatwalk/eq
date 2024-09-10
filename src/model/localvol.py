@@ -45,6 +45,31 @@ def dupire_local_var(dt, dk, k, w_vec_prev, w_vec):
     )
 
 
+def interp_vec(t, t_vec, w_vec):
+    """Given a 2-D array w_vec[t,k], return the interpolated 1D array w[k] at given time t."""
+
+    i_left = np.searchsorted(t_vec, t, side="left")
+    i_right = np.searchsorted(t_vec, t, side="right")
+
+    if i_left == i_right:
+        if i_right == 0:
+            w = w_vec[0] * (t / t_vec[0])
+        elif i_right == len(t_vec):
+            w = w_vec[-1]  # Consider extrapolation using the last slope
+        else:
+            i_left -= 1
+            t_right = t_vec[i_right]
+            t_left = t_vec[i_left]
+            den = t_right - t_left
+            w = (
+                w_vec[i_left]
+                + (w_vec[i_right] - w_vec[i_left]) * (t - t_left) / den
+            )
+    else:
+        w = w_vec[i_left]
+    return w
+
+
 class UniformGridInterp:
     """Helper class to interpolate, when x-array is uniformly spaced.
     This avoids the cost of index search in arbitrary x-array."""
@@ -87,54 +112,28 @@ class SVItoLV:
     """Helper class to convert SVI parameters to local volatility."""
 
     def __init__(self, svi_df, shape):
-        """Create a 2-D array of total variances (ws) by t and k.
-        The knots in t are the same as in the input svi_df."""
-        self.ugi = UniformGridInterp()
-        self.k_vec = np.pad(self.ugi.x_vec, 1)  # one more point on each side
+        self.ugi = UniformGridInterp()  # fast interpolator for uniform x-grid
+
+        # strike grid with one more point on each side
+        self.k_vec = np.pad(self.ugi.x_vec, 1)
         self.dk = self.ugi.dx
         self.k_vec[0] = self.k_vec[1] - self.dk
         self.k_vec[-1] = self.k_vec[-2] + self.dk
 
-        self.vol = np.zeros(shape)  # vol for each path
-
         self.t_vec = svi_df["texp"]
-        self.t_len = len(self.t_vec)
 
+        # Create a 2-D array of total variances (ws) by t and k.
         self.ws = np.zeros((len(self.t_vec), len(self.k_vec)))
         for i, t in enumerate(self.t_vec):
             self.ws[i] = svi(svi_df.loc[i], self.k_vec)
 
-        self.w_vec_prev = np.zeros(len(self.k_vec))
-
-    def total_var(self, t):
-        """Return the total variance (v^2 t) vector at time t
-        by interpolating from self.ws."""
-
-        i_left = np.searchsorted(self.t_vec, t, side="left")
-        i_right = np.searchsorted(self.t_vec, t, side="right")
-
-        if i_left == i_right:
-            if i_right == 0:
-                w = self.ws[0] * (t / self.t_vec[0])
-            elif i_right == self.t_len:
-                w = self.ws[-1]  # Consider extrapolation using the last slope
-            else:
-                i_left -= 1
-                t_right = self.t_vec[i_right]
-                t_left = self.t_vec[i_left]
-                den = t_right - t_left
-                w = (
-                    self.ws[i_left]
-                    + (self.ws[i_right] - self.ws[i_left]) * (t - t_left) / den
-                )
-        else:
-            w = self.ws[i_left]
-        return w
+        self.w_vec_prev = np.zeros(len(self.k_vec))  # total variance at t0
+        self.vol = np.zeros(shape)  # pre-allocate array for vol by path
 
     def advance_vol(self, prev_time, new_time, x_vec):
         """Advance w_vec to new_time and stores the local volatility between prev_time and new time.
         Returns the local volatility for the given x_vec."""
-        w_vec = self.total_var(new_time)
+        w_vec = interp_vec(new_time, self.t_vec, self.ws)
         lvar = dupire_local_var(
             new_time - prev_time,
             self.dk,
