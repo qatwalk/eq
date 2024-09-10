@@ -19,6 +19,32 @@ def svi(params, k):
     return w
 
 
+def dupire_local_var(dt, dk, k, w_vec_prev, w_vec):
+    """Calculate local variance (vol**2) from t0 to t1, given a list of strikes k, uniformly spaced by dk,
+    and the total variances (w = T * vol**2) at time t0 and t1.
+    The result vector is two elements shorter than the input vectors k and w."""
+
+    w = (w_vec + w_vec_prev) / 2
+    # time derivative of w
+    wt = (w_vec - w_vec_prev) / dt
+
+    # strike derivatives of w
+    wk = (w[2:] - w[:-2]) / (2 * dk)
+    wkk = (w[2:] + w[:-2] - 2 * w[1:-1]) / (dk**2)
+
+    # drop the extra points at top and bottom
+    w_ = w[1:-1]
+    wt_ = wt[1:-1]
+
+    # apply Dupire's formula
+    return wt_ / (
+        1
+        - k / w_ * wk
+        + 1 / 4 * (-1 / 4 - 1 / w_ + k**2 / w_**2) * (wk) ** 2
+        + 1 / 2 * wkk
+    )
+
+
 class UniformGridInterp:
     """Helper class to interpolate, when x-array is uniformly spaced.
     This avoids the cost of index search in arbitrary x-array."""
@@ -109,9 +135,10 @@ class SVItoLV:
         """Advance w_vec to new_time and stores the local volatility between prev_time and new time.
         Returns the local volatility for the given x_vec."""
         w_vec = self.total_var(new_time)
-        lvar = self._svi_local_var_step(
-            prev_time,
-            new_time,
+        lvar = dupire_local_var(
+            new_time - prev_time,
+            self.dk,
+            self.k_vec[1:-1],
             self.w_vec_prev,
             w_vec,
         )
@@ -119,32 +146,6 @@ class SVItoLV:
         self.w_vec_prev = w_vec
         lvol = np.sqrt(lvar)  # vol by strike grid
         self.ugi.interp(x_vec, lvol, out=self.vol)  # get vol by path
-
-    def _svi_local_var_step(self, t0, t1, w_vec_prev, w_vec):
-        """Calculate local variance (vol**2) from t0 to t1, given a list of strikes k, uniformly spaced by dk,
-        and the total variances (w = T * vol**2) at time t0 and t1.
-        The result vector is two elements shorter than the input vectors k and w."""
-
-        w = (w_vec + w_vec_prev) / 2
-        # time derivative of w
-        wt = (w_vec - w_vec_prev) / (t1 - t0)
-
-        # strike derivatives of w
-        wk = (w[2:] - w[:-2]) / (2 * self.dk)
-        wkk = (w[2:] + w[:-2] - 2 * w[1:-1]) / (self.dk**2)
-
-        # drop the extra points at top and bottom
-        w_ = w[1:-1]
-        k_ = self.k_vec[1:-1]
-        wt_ = wt[1:-1]
-
-        # apply Dupire's formula
-        return wt_ / (
-            1
-            - k_ / w_ * wk
-            + 1 / 4 * (-1 / 4 - 1 / w_ + k_**2 / w_**2) * (wk) ** 2
-            + 1 / 2 * wkk
-        )
 
 
 # Define a class for the state of a single asset BS Local Vol MC process
@@ -156,14 +157,12 @@ class LVMC(MCFixedStep):
 
         self.asset = self.dataset["LV"]["ASSET"]
         self.asset_fwd = Forwards(self.dataset["ASSETS"][self.asset])
-        self.spot = self.asset_fwd.forward(0)
         self.discounter = Discounter(
             self.dataset["ASSETS"][self.dataset["BASE"]]
         )
 
         # initialize helper for local vol calibration
         self.localvol = SVItoLV(self.dataset["LV"]["VOL"], self.n)
-        self.logspot = np.log(self.spot)
 
         # Initialize rng and any arrays
         self.rng = Generator(SFC64(self.dataset["MC"]["SEED"]))
@@ -177,24 +176,18 @@ class LVMC(MCFixedStep):
         """Update x_vec in place when we move simulation by time dt."""
 
         dt = new_time - self.cur_time
-        fwd_rate = self.asset_fwd.rate(new_time, self.cur_time)
 
-        # Get local vol, from current time to new time)
-        logfwd_shift = (
-            self.asset_fwd.log_forward_fn(self.cur_time) - self.logspot
-        )
-        np.subtract(self.x_vec, logfwd_shift, out=self.tmp)
-        self.localvol.advance_vol(self.cur_time, new_time, self.tmp)
+        # update local vol, from current time to new time
+        self.localvol.advance_vol(self.cur_time, new_time, self.x_vec)
 
-        # # generate the random numbers and advance the log stock process
+        # generate the random numbers and advance the log stock process
         self.rng.standard_normal(self.n, out=self.dz_vec)
         self.dz_vec *= sqrt(dt)
         self.dz_vec *= self.localvol.vol
 
-        # add drift to x_vec: (fwd_rate - vol * vol / 2.0) * dt
+        # add drift to x_vec: - vol * vol * dt / 2.0
         np.multiply(self.localvol.vol, self.localvol.vol, out=self.tmp)
         self.tmp *= -0.5 * dt
-        self.tmp += fwd_rate * dt
         self.x_vec += self.tmp
         # add the random part to x_vec
         self.x_vec += self.dz_vec
@@ -206,7 +199,7 @@ class LVMC(MCFixedStep):
         otherwise return none."""
 
         if unit == self.asset:
-            return self.spot * np.exp(self.x_vec)
+            return self.asset_fwd.forward(self.cur_time) * np.exp(self.x_vec)
 
     def get_df(self):
         return self.discounter.discount(self.cur_time)
