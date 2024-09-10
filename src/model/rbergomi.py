@@ -1,5 +1,5 @@
 """
-Monte Carlo Implementation of the rBergomi model using Qablet MCModel Interface.
+Monte Carlo Implementation of the rBergomi model using finmc interface.
 Uses the scheme proposed by Mikkel Bennedsen, Asger Lunde, and Mikko S Pakkanen.,
 "Hybrid scheme for Brownian semistationary processes.",
 Finance and Stochastics, 21(4): 931-965, 2017.
@@ -8,6 +8,7 @@ Finance and Stochastics, 21(4): 931-965, 2017.
 import numpy as np
 from finmc.models.base import MCBase
 from finmc.utils.assets import Discounter, Forwards
+from finmc.utils.mc import antithetic_normal
 from numpy.random import SFC64, Generator
 
 
@@ -69,6 +70,7 @@ class rBergomiMC(MCBase):
         self.k = 0  # step counter
         self.mean = np.array([0, 0])
         self.cov = cov(self.a, self.timestep)
+        self.dws = np.empty(self.n, dtype=np.float64)
 
         self.v_time = 0  # when V was updated
         self.x_time = 0  # when x_vec was updated, always on or after v_time
@@ -81,11 +83,11 @@ class rBergomiMC(MCBase):
         # two sets for the hybrid scheme for variance
         self.dwv = self.rng.multivariate_normal(self.mean, self.cov, self.n)
         # one set for stock, correlated to dwv[:, 0]
-        dws = self.rng.normal(
-            0, np.sqrt(self.timestep) * self.rho_comp, self.n
+        antithetic_normal(
+            self.rng, self.n, np.sqrt(self.timestep) * self.rho_comp, self.dws
         )
-        dws += self.rho * self.dwv[:, 0]
-        self.x_diff = np.sqrt(self.V) * dws - self.V / 2.0 * self.timestep
+        self.dws += self.rho * self.dwv[:, 0]
+        self.x_diff = np.sqrt(self.V) * self.dws - self.V / 2.0 * self.timestep
 
     def advance_x_vec(self, new_time):
         """Update the log stock process."""

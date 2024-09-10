@@ -1,6 +1,6 @@
 """
-Monte Carlo Implementation of local vol model. The model takes volatility as
-SVI parameters and calculates local volatility using Dupire's formula.
+Monte Carlo Implementation of a local vol model using finmc interface.
+The model takes volatility as SVI parameters and calculates local volatility using Dupire's formula.
 """
 
 from math import sqrt
@@ -8,6 +8,9 @@ from math import sqrt
 import numpy as np
 from finmc.models.base import MCFixedStep
 from finmc.utils.assets import Discounter, Forwards
+from finmc.utils.bs import dupire_local_var
+from finmc.utils.interp import UniformGridInterp
+from finmc.utils.mc import antithetic_normal
 from numpy.random import SFC64, Generator
 
 
@@ -23,32 +26,6 @@ def svi_vol(params, k):
     """Get vol from SVI params and log strikes."""
     w = svi_tvar(params, k)  # total variance
     return np.sqrt(w / params["texp"])
-
-
-def dupire_local_var(dt, dk, k, w_vec_prev, w_vec):
-    """Calculate local variance (vol**2) from t0 to t1, given a list of strikes k, uniformly spaced by dk,
-    and the total variances (w = T * vol**2) at time t0 and t1.
-    The result vector is two elements shorter than the input vectors k and w."""
-
-    w = (w_vec + w_vec_prev) / 2
-    # time derivative of w
-    wt = (w_vec - w_vec_prev) / dt
-
-    # strike derivatives of w
-    wk = (w[2:] - w[:-2]) / (2 * dk)
-    wkk = (w[2:] + w[:-2] - 2 * w[1:-1]) / (dk**2)
-
-    # drop the extra points at top and bottom
-    w_ = w[1:-1]
-    wt_ = wt[1:-1]
-
-    # apply Dupire's formula
-    return wt_ / (
-        1
-        - k / w_ * wk
-        + 1 / 4 * (-1 / 4 - 1 / w_ + k**2 / w_**2) * (wk) ** 2
-        + 1 / 2 * wkk
-    )
 
 
 def interp_vec(t, t_vec, w_vec):
@@ -74,44 +51,6 @@ def interp_vec(t, t_vec, w_vec):
     else:
         w = w_vec[i_left]
     return w
-
-
-class UniformGridInterp:
-    """Helper class to interpolate, when x-array is uniformly spaced.
-    This avoids the cost of index search in arbitrary x-array."""
-
-    def __init__(self, xmin=-6.0, xmax=6.0, dx=0.01):
-        """Initialize the x-range and allocate some arrays."""
-
-        self.dx = dx
-        self.xmin = xmin
-        self.x_vec = np.arange(xmin, xmax + dx / 2, dx)
-        self.xlen = len(self.x_vec)
-
-        # Pre-allocate arrays
-        self.slope = np.zeros(self.xlen)
-
-    def interp(self, x_vec, y_vec, out):
-        """Interpolate y_vec at x_vec and store the result in out."""
-
-        # Find the left index of the interval containing x: idx = floor((x - xmin) / dx)
-        # Reusing the out array as a temp array, as it is the same shape
-        np.subtract(x_vec, self.xmin, out=out)
-        np.divide(out, self.dx, out=out)
-        idx = out.astype(int)
-
-        # Clip the index to [0, xlen - 1]
-        np.clip(idx, 0, self.xlen - 1, out=idx)
-
-        # get slope of y in each interval
-        np.subtract(y_vec[1:], y_vec[:-1], out=self.slope[:-1])
-        self.slope[-1] = self.slope[-2]
-        np.divide(self.slope, self.dx, out=self.slope)
-
-        # y = (x - left) * slope + left
-        np.subtract(x_vec, self.x_vec[idx], out=out)  # x - left
-        np.multiply(out, self.slope[idx], out=out)  # * slope
-        np.add(out, y_vec[idx], out=out)  # + left
 
 
 class SVItoLV:
@@ -189,8 +128,7 @@ class LVMC(MCFixedStep):
         self.localvol.advance_vol(self.cur_time, new_time, self.x_vec)
 
         # generate the random numbers and advance the log stock process
-        self.rng.standard_normal(self.n, out=self.dz_vec)
-        self.dz_vec *= sqrt(dt)
+        antithetic_normal(self.rng, self.n, sqrt(dt), self.dz_vec)
         self.dz_vec *= self.localvol.vol
 
         # add drift to x_vec: - vol * vol * dt / 2.0
